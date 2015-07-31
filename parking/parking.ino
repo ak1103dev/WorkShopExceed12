@@ -1,29 +1,44 @@
 #include <pt.h>
+#include <Servo.h>
 
 #define PT_DELAY(pt, ms, ts) \
     ts = millis(); \
     PT_WAIT_WHILE(pt, millis()-ts < (ms));
 
+// PIN_SENSOR
 #define PIN_LED 12
+#define PIN_SERVO 3
 
+// LED & LCD STATUS
 #define FREE 0
 #define RESERVE 1
 #define PARK 2
 
+// READ WRITE VALUE
+long duration = 0;  // Ultrasonic
+long distance = 0;  // Ultrasonic
 String val = "F";
 String car_ID = "";
+int check_Free = 0;
+
+Servo myservo;
 
 int ledStatus = FREE;
 
 struct pt pt_taskLED;
+struct pt pt_taskSERVO;
 struct pt pt_taskSendSerial;
+
 
 ///////////////////////////////////////////////////////
 void setValue(){
   car_ID = val.substring(1,7);
   switch(val.charAt(0)) {
     case 'R':
-	  ledStatus = RESERVE;
+      ledStatus = RESERVE;
+    break;
+    case 'P':
+      ledStatus = PARK;
     break;
   }
 }
@@ -83,19 +98,42 @@ PT_THREAD(taskLED(struct pt* pt))
 }
 
 ///////////////////////////////////////////////////////
+PT_THREAD(taskSERVO(struct pt* pt))
+{
+  static uint32_t ts;
+
+  PT_BEGIN(pt);
+
+  while (1)
+  {
+    if(val.charAt(0) == 'R'){
+      myservo.write(90);
+    }
+    else if(val.charAt(0) == 'P'){
+      myservo.write(0);
+    }
+    PT_DELAY(pt, 150, ts);
+  }
+
+  PT_END(pt);
+}
+
+///////////////////////////////////////////////////////
 void setup()
 {
-  Serial1.begin(115200);
-  Serial.begin(115200);
-
+  myservo.attach(PIN_SERVO);
   pinMode(PIN_LED, OUTPUT);
   PT_INIT(&pt_taskLED);
+  PT_INIT(&pt_taskSERVO);
+  Serial1.begin(115200);
+  Serial.begin(115200);
 }
 
 ///////////////////////////////////////////////////////
 void loop()
 {
   taskLED(&pt_taskLED);
+  taskSERVO(&pt_taskSERVO);
 
   serialEvent();
   taskSendSerial(&pt_taskSendSerial);
